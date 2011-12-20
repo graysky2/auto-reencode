@@ -22,5 +22,5 @@ for file in $(find -maxdepth 1 -mindepth 1 -iname '*.flv'); do
 		continue
 	fi
 
-	HandBrakeCLI -i "${file}" -o "${outputname}" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct=0:me=umh:direct=temporal:trellis=0:b-adapt=2 --vb ${vkbps} -2 -T --aencoder faac -B ${akbps} || rm -f -- "${outputname}"
+	HandBrakeCLI -i "${file}" -o "${outputname}" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 --vb ${vkbps} -2 -T --aencoder faac -B ${akbps} || rm -f -- "${outputname}"
 done
