@@ -1,9 +1,9 @@
-#Autoflv2x264
+#Auto-reencode
 
-Mass convert flv to x264 using handbrake with this handy script.
+Mass convert any filetype that is readabled by handbrake to an mp4 contained x264 encode.
 Deps = handbrake-cli mediainfo perl
 
 Usage: call the script in the directory containing the flv files.
 
 ## Links
-AUR Package: https://aur.archlinux.org/packages/autoflv2x264
+AUR Package: https://aur.archlinux.org/packages/auto-reencode

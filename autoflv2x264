@@ -4,23 +4,39 @@
 # the new file via mediainfo.
 
 IFS=$'\012'
-for file in $(find -maxdepth 1 -mindepth 1 -iname '*.flv'); do
-	# find flv bitrate for video and audio
-	vkbps=$(perl -e "print $(mediainfo --inform="Video;%BitRate%" "${file}") / 1000")
-	akbps=$(perl -e "print $(mediainfo --inform="Audio;%BitRate%" "${file}") / 1000")
-	outputname="${file%.*}.mkv"
+echo 'Enter target file extension [flv]:'
+read EXT
 
-	echo filename is "${file}"
-	echo videobit rate set to "${vkbps}"
-	echo audobit rate set to "${akbps}"
+[[ -z "$EXT" ]] && EXT="flv"
 
-	# do not overwrite existing mkv's
-	if [[ -e "${outputname}" ]]; then
-		echo >&2 Output file already exists: "${outputname}"
+if [[ $(find -maxdepth 1 -mindepth 1 -type f -name "*.$EXT" 2>/dev/null | grep -q .) -gt 0 ]]; then
+	echo "Cannot find any .$EXT files so exiting."
+	exit 1
+fi
+
+for file in $(find -maxdepth 1 -mindepth 1 -type f -name "*.$EXT"); do
+	# capture the dts on the target file
+	target_dts=$(date -d "$(stat -c %Y "$file" | awk '{print strftime("%c",$1)}')" +%Y%m%d%H%M.%S)
+	# find bitrate for video and audio
+	vkbps=$(perl -e "print $(mediainfo --inform="Video;%BitRate%" "$file") / 1000")
+	akbps=$(perl -e "print $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000")
+
+	echo filename is "$file"
+	echo dts is "$target_dts"
+	echo videobit rate set to "$vkbps"
+	echo audobit rate set to "$akbps"
+
+	# do not overwrite existing files
+	if [[ -e "${file%.*}.mp4" ]]; then
+		echo >&2 Output file already exists: "${file%.*}.mp4"
 		echo >&2 Skipping...
 		echo >&2
 		continue
 	fi
 
-	HandBrakeCLI -i "${file}" -o "${outputname}" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" || rm -f -- "${outputname}"
+	# encode
+	HandBrakeCLI -i "${file}" -o "${file%.*}.mp4" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" || rm -f -- "${file%.*}.mp4"
+
+	# restore dts
+	touch -t "$target_dts" "${file%.*}.mp4"
 done
