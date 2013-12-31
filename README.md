@@ -1,9 +1,14 @@
 #Auto-reencode
+Mass convert any format readable by handbrake to mp4 contained x264. Script honors original bitrates when converting. Script is recursive.
 
-Mass convert any filetype that is readabled by handbrake to an mp4 contained x264 encode.
-Deps = handbrake-cli mediainfo perl
+## Deps
+* handbrake-cli
+* mediainfo
+* perl
 
-Usage: call the script in the directory containing the flv files.
+## Usage
+
+Call the script in the directory containing the target files to convert.
 
 ## Links
 AUR Package: https://aur.archlinux.org/packages/auto-reencode
