@@ -16,7 +16,7 @@ fi
 
 for file in $(find -maxdepth 1 -mindepth 1 -type f -name "*.$EXT"); do
 	# capture the dts on the target file
-	target_dts=$(date -d "$(stat -c %Y "$file" | awk '{print strftime("%c",$1)}')" +%Y%m%d%H%M.%S)
+	target_dts=$(stat -c %Y "$file")
 	# find bitrate for video and audio
 	vkbps=$(perl -e "print $(mediainfo --inform="Video;%BitRate%" "$file") / 1000")
 	akbps=$(perl -e "print $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000")
@@ -38,5 +38,5 @@ for file in $(find -maxdepth 1 -mindepth 1 -type f -name "*.$EXT"); do
 	HandBrakeCLI -i "${file}" -o "${file%.*}.mp4" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" || rm -f -- "${file%.*}.mp4"
 
 	# restore dts
-	touch -t "$target_dts" "${file%.*}.mp4"
+	touch -d @"$target_dts" "${file%.*}.mp4"
 done
