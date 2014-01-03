@@ -3,6 +3,18 @@
 # There are no arguments. The script will copy both the audio and video bitrates into
 # the new file via mediainfo.
 
+ostype() { echo $OSTYPE | tr '[A-Z]' '[a-z]'; }
+
+case "$(ostype)" in
+    *'linux'* ) SHELL_PLATFORM='linux' ;;
+    *'darwin'*) SHELL_PLATFORM='osx'   ;;
+    *'bsd'*   ) SHELL_PLATFORM='bsd'   ;;
+esac
+
+shell_is_linux() { [[ $SHELL_PLATFORM == 'linux' || $SHELL_PLATFORM == 'bsd' ]]; }
+shell_is_osx()   { [[ $SHELL_PLATFORM == 'osx' ]]; }
+shell_is_bsd()   { [[ $SHELL_PLATFORM == 'bsd' || $SHELL_PLATFORM == 'osx' ]]; }
+
 IFS=$'\012'
 echo 'Enter target file extension [flv]:'
 read EXT
@@ -16,7 +28,12 @@ fi
 
 for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 	# capture the dts on the target file
-	target_dts=$(stat -c %Y "$file")
+    if shell_is_osx || shell_is_bsd; then
+        target_dts=$(stat -f "%m" "$file")
+    elif shell_is_linux; then
+        target_dts=$(stat -c "%Y" "$file")
+    fi
+
 	# find bitrate for video and audio
 	vkbps=$(perl -e "print $(mediainfo --inform="Video;%BitRate%" "$file") / 1000")
 	akbps=$(perl -e "print $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000")
