@@ -9,12 +9,12 @@ read EXT
 
 [[ -z "$EXT" ]] && EXT="flv"
 
-if [[ $(find -maxdepth 1 -mindepth 1 -type f -name "*.$EXT" 2>/dev/null | grep -q .) -gt 0 ]]; then
+if [[ $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null | grep -q .) -gt 0 ]]; then
 	echo "Cannot find any .$EXT files so exiting."
 	exit 1
 fi
 
-for file in $(find -maxdepth 1 -mindepth 1 -type f -name "*.$EXT"); do
+for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 	# capture the dts on the target file
 	target_dts=$(stat -c %Y "$file")
 	# find bitrate for video and audio
