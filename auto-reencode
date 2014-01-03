@@ -35,8 +35,8 @@ for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
     fi
 
 	# find bitrate for video and audio
-	vkbps=$(perl -e "print $(mediainfo --inform="Video;%BitRate%" "$file") / 1000")
-	akbps=$(perl -e "print $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000")
+	vkbps=$(expr $(mediainfo --inform="Video;%BitRate%" "$file") / 1000)
+	akbps=$(expr $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000)
 
 	echo filename is "$file"
 	echo dts is "$target_dts"
