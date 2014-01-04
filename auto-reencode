@@ -3,7 +3,7 @@
 # There are no arguments. The script will copy both the audio and video bitrates into
 # the new file via mediainfo.
 
-ostype() { echo $OSTYPE | tr '[A-Z]' '[a-z]'; }
+ostype() { echo "$OSTYPE" | tr '[A-Z]' '[a-z]'; }
 
 case "$(ostype)" in
     *'linux'* ) SHELL_PLATFORM='linux' ;;
@@ -11,9 +11,9 @@ case "$(ostype)" in
     *'bsd'*   ) SHELL_PLATFORM='bsd'   ;;
 esac
 
-shell_is_linux() { [[ $SHELL_PLATFORM == 'linux' || $SHELL_PLATFORM == 'bsd' ]]; }
-shell_is_osx()   { [[ $SHELL_PLATFORM == 'osx' ]]; }
-shell_is_bsd()   { [[ $SHELL_PLATFORM == 'bsd' || $SHELL_PLATFORM == 'osx' ]]; }
+shell_is_linux() { [[ "$SHELL_PLATFORM" == 'linux' || "$SHELL_PLATFORM" == 'bsd' ]]; }
+shell_is_osx()   { [[ "$SHELL_PLATFORM" == 'osx' ]]; }
+shell_is_bsd()   { [[ "$SHELL_PLATFORM" == 'bsd' || "$SHELL_PLATFORM" == 'osx' ]]; }
 
 IFS=$'\012'
 echo 'Enter target file extension [flv]:'
