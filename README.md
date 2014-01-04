@@ -4,7 +4,6 @@ Mass convert any format readable by handbrake to mp4 contained x264. Script hono
 ## Deps
 * handbrake-cli
 * mediainfo
-* perl
 
 ## Usage
 

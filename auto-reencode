@@ -3,23 +3,40 @@
 # There are no arguments. The script will copy both the audio and video bitrates into
 # the new file via mediainfo.
 
+ostype() { echo "$OSTYPE" | tr '[A-Z]' '[a-z]'; }
+
+case "$(ostype)" in
+    *'linux'* ) SHELL_PLATFORM='linux' ;;
+    *'darwin'*) SHELL_PLATFORM='osx'   ;;
+    *'bsd'*   ) SHELL_PLATFORM='bsd'   ;;
+esac
+
+shell_is_linux() { [[ "$SHELL_PLATFORM" == 'linux' || "$SHELL_PLATFORM" == 'bsd' ]]; }
+shell_is_osx()   { [[ "$SHELL_PLATFORM" == 'osx' ]]; }
+shell_is_bsd()   { [[ "$SHELL_PLATFORM" == 'bsd' || "$SHELL_PLATFORM" == 'osx' ]]; }
+
 IFS=$'\012'
 echo 'Enter target file extension [flv]:'
 read EXT
 
 [[ -z "$EXT" ]] && EXT="flv"
 
-if [[ $(find -maxdepth 1 -mindepth 1 -type f -name "*.$EXT" 2>/dev/null | grep -q .) -gt 0 ]]; then
+if [[ $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null | grep -q .) -gt 0 ]]; then
 	echo "Cannot find any .$EXT files so exiting."
 	exit 1
 fi
 
-for file in $(find -maxdepth 1 -mindepth 1 -type f -name "*.$EXT"); do
+for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 	# capture the dts on the target file
-	target_dts=$(date -d "$(stat -c %Y "$file" | awk '{print strftime("%c",$1)}')" +%Y%m%d%H%M.%S)
+    if shell_is_osx || shell_is_bsd; then
+        target_dts=$(stat -f "%m" "$file")
+    elif shell_is_linux; then
+        target_dts=$(stat -c "%Y" "$file")
+    fi
+
 	# find bitrate for video and audio
-	vkbps=$(perl -e "print $(mediainfo --inform="Video;%BitRate%" "$file") / 1000")
-	akbps=$(perl -e "print $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000")
+	vkbps=$(expr $(mediainfo --inform="Video;%BitRate%" "$file") / 1000)
+	akbps=$(expr $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000)
 
 	echo filename is "$file"
 	echo dts is "$target_dts"
@@ -38,5 +55,5 @@ for file in $(find -maxdepth 1 -mindepth 1 -type f -name "*.$EXT"); do
 	HandBrakeCLI -i "${file}" -o "${file%.*}.mp4" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" || rm -f -- "${file%.*}.mp4"
 
 	# restore dts
-	touch -t "$target_dts" "${file%.*}.mp4"
+	touch -r "$file" "${file%.*}.mp4"
 done
