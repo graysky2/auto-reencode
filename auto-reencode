@@ -1,7 +1,8 @@
 #!/bin/bash
-# Run this script in the dir containing all the flv files you wish to convert to x264.
-# There are no arguments. The script will copy both the audio and video bitrates into
-# the new file via mediainfo.
+# Run this script in the dir containing the target files you wish to convert
+# to x264.  There are no arguments.  
+# The script will copy both the audio and video bitrates into the new file 
+# via metadata from mediainfo and will retain the original DTS for you.
 
 ostype() { echo "$OSTYPE" | tr '[A-Z]' '[a-z]'; }
 
