@@ -17,16 +17,23 @@ shell_is_osx()   { [[ "$SHELL_PLATFORM" == 'osx' ]]; }
 shell_is_bsd()   { [[ "$SHELL_PLATFORM" == 'bsd' || "$SHELL_PLATFORM" == 'osx' ]]; }
 
 IFS=$'\012'
-echo 'Enter target file extension [flv]:'
+echo 'Enter target file extension [flv,wmv]:'
 read EXT
 
 [[ -z "$EXT" ]] && EXT="flv"
 
 if [[ $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null | grep -q .) -gt 0 ]]; then
+	echo "Cannot find any .$EXT files so trying .wmv"
+fi
+
+EXT="wmv"
+if [[ $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null | grep -q .) -gt 0 ]]; then
 	echo "Cannot find any .$EXT files so exiting."
 	exit 1
 fi
 
+total=$(find . ! -name . -prune -type f -name "*.$EXT"|wc -l)
+n=0
 for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 	# capture the dts on the target file
     if shell_is_osx || shell_is_bsd; then
@@ -39,11 +46,12 @@ for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 	vkbps=$(expr $(mediainfo --inform="Video;%BitRate%" "$file") / 1000)
 	akbps=$(expr $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000)
 
-	echo filename is "$file"
-	echo dts is "$target_dts"
-	echo videobit rate set to "$vkbps"
-	echo audobit rate set to "$akbps"
-
+	n=$(( $n + 1 ))
+	echo "Task $n of $total"
+	echo " file to encode : ${file%.*}"|sed 's|./||'
+	echo " video bitrate  : $vkbps kbps"
+	echo " audio bitrate  : $akbps kbps"
+	
 	# do not overwrite existing files
 	if [[ -e "${file%.*}.mp4" ]]; then
 		echo >&2 Output file already exists: "${file%.*}.mp4"
@@ -53,7 +61,8 @@ for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 	fi
 
 	# encode
-	HandBrakeCLI -i "${file}" -o "${file%.*}.mp4" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" || rm -f -- "${file%.*}.mp4"
+	HandBrakeCLI -i "${file}" -o "${file%.*}.mp4" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" 2>/dev/null || rm -f -- "${file%.*}.mp4"
+	echo 
 
 	# restore dts
 	touch -r "$file" "${file%.*}.mp4"
