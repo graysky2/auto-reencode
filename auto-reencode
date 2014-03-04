@@ -61,7 +61,7 @@ for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 	fi
 
 	# encode
-	HandBrakeCLI -i "${file}" -o "${file%.*}.mp4" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" 2>/dev/null || rm -f -- "${file%.*}.mp4"
+	HandBrakeCLI -i "${file}" -o "${file%.*}.mp4" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 -5 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" 2>/dev/null || rm -f -- "${file%.*}.mp4"
 	echo 
 
 	# restore dts
