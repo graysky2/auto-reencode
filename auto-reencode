@@ -38,17 +38,21 @@ IFS=$'\012'
 echo 'Enter target file extension [flv,wmv]:'
 read EXT
 
+# check for files to work on and exit if not are found
+if [[ -z $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null) ]]; then
+	EXT="flv"
+	if [[ -z $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null) ]]; then
+		EXT="wmv"
+		if [[ -z $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null) ]]; then
+			echo "Cannot find any target files so no work to do."
+			echo "Define a target file type in this dirtree and try again."
+			exit 1
+		fi
+	fi
+fi
+
 [[ -z "$EXT" ]] && EXT="flv"
 
-if [[ $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null | grep -q .) -gt 0 ]]; then
-	echo "Cannot find any .$EXT files so trying .wmv"
-fi
-
-EXT="wmv"
-if [[ $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null | grep -q .) -gt 0 ]]; then
-	echo "Cannot find any .$EXT files so exiting."
-	exit 1
-fi
 
 total=$(find . ! -name . -prune -type f -name "*.$EXT"|wc -l)
 n=0
