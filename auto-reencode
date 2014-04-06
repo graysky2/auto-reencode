@@ -1,20 +1,38 @@
 #!/bin/bash
 # Run this script in the dir containing the target files you wish to convert
-# to x264.  There are no arguments.  
-# The script will copy both the audio and video bitrates into the new file 
+# to x264.  There are no arguments.
+# The script will copy both the audio and video bitrates into the new file
 # via metadata from mediainfo and will retain the original DTS for you.
 
 ostype() { echo "$OSTYPE" | tr '[A-Z]' '[a-z]'; }
 
 case "$(ostype)" in
-    *'linux'* ) SHELL_PLATFORM='linux' ;;
-    *'darwin'*) SHELL_PLATFORM='osx'   ;;
-    *'bsd'*   ) SHELL_PLATFORM='bsd'   ;;
+	*'linux'* ) SHELL_PLATFORM='linux'
+		;;
+	*'darwin'*) SHELL_PLATFORM='osx'
+		;;
+	*'bsd'*   ) SHELL_PLATFORM='bsd'
+		;;
 esac
 
 shell_is_linux() { [[ "$SHELL_PLATFORM" == 'linux' || "$SHELL_PLATFORM" == 'bsd' ]]; }
-shell_is_osx()   { [[ "$SHELL_PLATFORM" == 'osx' ]]; }
-shell_is_bsd()   { [[ "$SHELL_PLATFORM" == 'bsd' || "$SHELL_PLATFORM" == 'osx' ]]; }
+shell_is_osx() { [[ "$SHELL_PLATFORM" == 'osx' ]]; }
+shell_is_bsd() { [[ "$SHELL_PLATFORM" == 'bsd' || "$SHELL_PLATFORM" == 'osx' ]]; }
+
+report() {
+	echo "Task $n of $total"
+	echo " file to encode : ${file%.*}"|sed 's|./||'
+	echo " video bitrate  : $vkbps kbps"
+	echo " audio bitrate  : $akbps kbps"
+}
+
+report_in_color() {
+	export BLD="\e[01m" RED="\e[01;31m" BLU="\e[01;34m" NRM="\e[00m"
+	echo -e ${BLD}${RED}"Task $n of $total"${NRM}
+	echo -e ${BLD}" file to encode :${BLU} ${file%.*}"|sed 's|./||'
+	echo -e ${NRM}${BLD}" video bitrate  : $vkbps kbps"${NRM}
+	echo -e ${BLD}" audio bitrate  : $akbps kbps"${NRM}
+}
 
 IFS=$'\012'
 echo 'Enter target file extension [flv,wmv]:'
@@ -35,23 +53,21 @@ fi
 total=$(find . ! -name . -prune -type f -name "*.$EXT"|wc -l)
 n=0
 for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
-	# capture the dts on the target file
-    if shell_is_osx || shell_is_bsd; then
-        target_dts=$(stat -f "%m" "$file")
-    elif shell_is_linux; then
-        target_dts=$(stat -c "%Y" "$file")
-    fi
 
 	# find bitrate for video and audio
 	vkbps=$(expr $(mediainfo --inform="Video;%BitRate%" "$file") / 1000)
 	akbps=$(expr $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000)
-
 	n=$(( $n + 1 ))
-	echo "Task $n of $total"
-	echo " file to encode : ${file%.*}"|sed 's|./||'
-	echo " video bitrate  : $vkbps kbps"
-	echo " audio bitrate  : $akbps kbps"
-	
+
+	# capture the dts on the target file and report progress using color or not
+	if shell_is_osx || shell_is_bsd; then
+		target_dts=$(stat -f "%m" "$file")
+		report
+	elif shell_is_linux; then
+		target_dts=$(stat -c "%Y" "$file")
+		report_in_color
+	fi
+
 	# do not overwrite existing files
 	if [[ -e "${file%.*}.mp4" ]]; then
 		echo >&2 Output file already exists: "${file%.*}.mp4"
@@ -61,7 +77,9 @@ for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 	fi
 
 	# encode
-	HandBrakeCLI -i "${file}" -o "${file%.*}.mp4" --encoder x264 bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 -5 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" 2>/dev/null || rm -f -- "${file%.*}.mp4"
+	HandBrakeCLI -i "${file}" -o "${file%.*}.mp4" --encoder x264 \
+		bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 \
+		-5 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" 2>/dev/null || rm -f -- "${file%.*}.mp4"
 	echo 
 
 	# restore dts
