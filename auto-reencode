@@ -23,27 +23,31 @@ report() {
 }
 
 pass1() {
-  # For syntax, see: https://trac.ffmpeg.org/wiki/Encode/H.264 
-
-  # Note that the 3rd line redirects the mbtree and log from the first pass to
-  # /tmp which should be tmpfs (on Arch anyway) configured to be 1/2 of the 
-  # physical RAM on the machine
+  # For syntax, see: https://trac.ffmpeg.org/wiki/Encode/H.264
 
   ffmpeg -v quiet -stats -y -i "${file}" \
     -c:v libx264 -preset slow -b:v "$vkbps"k -pass 1 \
-    -passlogfile /tmp/ffmpeg2pass \
+    -passlogfile "$logfile" \
     -c:a aac -b:a "$akbps"k -f mp4 /dev/null
 }
 
 pass2() {
   ffmpeg -v quiet -stats -i "${file}" -c:v libx264 \
     -preset slow -b:v "$vkbps"k -pass 2 \
-    -passlogfile /tmp/ffmpeg2pass \
+    -passlogfile "$logfile" \
     -c:a aac -b:a "$akbps"k "${file%.*}.mp4"
-  
+
   # remove the 1st pass log and mbtree files
-  rm -f /tmp/ffmpeg2pass*
+  rm -f "$logfile"*
 }
+
+if df -T /tmp | grep -m 1 -q tmpfs; then
+  # /tmp is tmpfs so use it for the mbtree and log files
+  logfile=/tmp/auto-reencode_ffmpeg2pass
+else
+  # /tmp is not tmpfs so just writeout mbtree and logs in the working dir
+  logfile=auto-reencode_ffmpeg2pass
+fi
 
 IFS=$'\012'
 echo 'Enter target file extension [flv,wmv]:'
