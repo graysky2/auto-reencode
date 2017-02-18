@@ -1,16 +1,17 @@
-#Auto-reencode
-Mass convert any format video that is readable by handbrake to mp4 contained x264 files.
-* Runs under Linux, OSX, and BSD.
+# Auto-reencode
+### Purpose
+Mass convert wmv and flv files to mp4 contained x264 files using ffmpeg.
 * Retains file's original bitrates (audio/video).
 * Retains file's original date/time stamp.
 * Functions recursively automatically.
+* Temp files for 2 pass encode are written to /tmp (should be tmpfs).
 
-## Deps
-* handbrake-cli
-* mediainfo
-
-## Usage
+### Usage
 Call the script in the directory containing the target files to convert.
 
-## Links
+### Links
 AUR Package: https://aur.archlinux.org/packages/auto-reencode
+
+### Dependencies
+* ffmpeg
+* mediainfo

@@ -1,89 +1,102 @@
 #!/bin/bash
-# Run this script in the dir containing the target files you wish to convert
-# to x264.  There are no arguments.
+# Run in the dir containing the target files you wish to convert to x264.
+# There are no arguments.
 # The script will copy both the audio and video bitrates into the new file
 # via metadata from mediainfo and will retain the original DTS for you.
 
-ostype() { echo "$OSTYPE" | tr '[A-Z]' '[a-z]'; }
+export BLD="\e[01m" RED="\e[01;31m" BLU="\e[01;34m" NRM="\e[00m"
 
-case "$(ostype)" in
-	*'linux'* ) SHELL_PLATFORM='linux'
-		;;
-	*'darwin'*) SHELL_PLATFORM='osx'
-		;;
-	*'bsd'*   ) SHELL_PLATFORM='bsd'
-		;;
-esac
+command -v ffmpeg >/dev/null 2>&1 || {
+echo -e "${BLD}${RED}I require ffmpeg but it's not installed. Aborting.${NRM}" >&2
+exit 1; }
 
-shell_is_linux() { [[ "$SHELL_PLATFORM" == 'linux' || "$SHELL_PLATFORM" == 'bsd' ]]; }
-shell_is_osx() { [[ "$SHELL_PLATFORM" == 'osx' ]]; }
-shell_is_bsd() { [[ "$SHELL_PLATFORM" == 'bsd' || "$SHELL_PLATFORM" == 'osx' ]]; }
+command -v mediainfo >/dev/null 2>&1 || {
+echo "${BLD}${RED}I require ffmpeg but it's not installed. Aborting.${NRM}" >&2
+exit 1; }
 
 report() {
-	echo "Task $n of $total"
-	echo " file to encode : ${file%.*}"|sed 's|./||'
-	echo " video bitrate  : $vkbps kbps"
-	echo " audio bitrate  : $akbps kbps"
+  echo -e "${BLD}${RED}Task $n of $total${NRM}"
+  echo -e "${BLD} file to encode    :${BLU} ${file%.*}"|sed 's|./||'
+  echo -e "${NRM}${BLD} video bitrate     : $vkbps kbps${NRM}"
+  echo -e "${BLD} audio bitrate     : $akbps kbps${NRM}"
+  echo -e "${BLD} play time         : $ptime${NRM}"
 }
 
-report_in_color() {
-	export BLD="\e[01m" RED="\e[01;31m" BLU="\e[01;34m" NRM="\e[00m"
-	echo -e ${BLD}${RED}"Task $n of $total"${NRM}
-	echo -e ${BLD}" file to encode :${BLU} ${file%.*}"|sed 's|./||'
-	echo -e ${NRM}${BLD}" video bitrate  : $vkbps kbps"${NRM}
-	echo -e ${BLD}" audio bitrate  : $akbps kbps"${NRM}
+pass1() {
+  # For syntax, see: https://trac.ffmpeg.org/wiki/Encode/H.264 
+
+  # Note that the 3rd line redirects the mbtree and log from the first pass to
+  # /tmp which should be tmpfs (on Arch anyway) configured to be 1/2 of the 
+  # physical RAM on the machine
+
+  ffmpeg -v quiet -stats -y -i "${file}" \
+    -c:v libx264 -preset slow -b:v "$vkbps"k -pass 1 \
+    -passlogfile /tmp/ffmpeg2pass \
+    -c:a aac -b:a "$akbps"k -f mp4 /dev/null
+}
+
+pass2() {
+  ffmpeg -v quiet -stats -i "${file}" -c:v libx264 \
+    -preset slow -b:v "$vkbps"k -pass 2 \
+    -passlogfile /tmp/ffmpeg2pass \
+    -c:a aac -b:a "$akbps"k "${file%.*}.mp4"
+  
+  # remove the 1st pass log and mbtree files
+  rm -f /tmp/ffmpeg2pass*
 }
 
 IFS=$'\012'
 echo 'Enter target file extension [flv,wmv]:'
-read EXT
+read -r EXT
 
 # check for files to work on and exit if not are found
 if [[ -z $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null) ]]; then
-	EXT="flv"
-	if [[ -z $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null) ]]; then
-		EXT="wmv"
-		if [[ -z $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null) ]]; then
-			echo "Cannot find any target files so no work to do."
-			echo "Define a target file type in this dirtree and try again."
-			exit 1
-		fi
-	fi
+  EXT="flv"
+  if [[ -z $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null) ]]; then
+    EXT="wmv"
+    if [[ -z $(find . ! -name . -prune -type f -name "*.$EXT" 2>/dev/null) ]]; then
+      echo -e "${BLD}Cannot find any target files so no work to do.${NRM}"
+      echo -e "${BLD}Define a target file type in this dirtree and try again.${NRM}"
+      exit 1
+    fi
+  fi
 fi
 
 [[ -z "$EXT" ]] && EXT="flv"
-
 
 total=$(find . ! -name . -prune -type f -name "*.$EXT"|wc -l)
 n=0
 for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 
-	# find bitrate for video and audio
-	vkbps=$(expr $(mediainfo --inform="Video;%BitRate%" "$file") / 1000)
-	akbps=$(expr $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000)
-	n=$(( $n + 1 ))
+  # find bitrate for video and audio
+  vkbps=$(( $(mediainfo --inform="Video;%BitRate%" "$file") / 1000))
+  akbps=$(( $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000))
+  ptime=$(mediainfo --inform="General;%Duration/String2%" "$file")
+  n=$(( n + 1 ))
 
-	# report progress using color or not
-	if shell_is_osx || shell_is_bsd; then
-		report
-	elif shell_is_linux; then
-		report_in_color
-	fi
+  report
 
-	# do not overwrite existing files
-	if [[ -e "${file%.*}.mp4" ]]; then
-		echo >&2 Output file already exists: "${file%.*}.mp4"
-		echo >&2 Skipping...
-		echo >&2
-		continue
-	fi
+  # do not overwrite existing files
+  if [[ -e "${file%.*}.mp4" ]]; then
+    echo >&2 Output file already exists: "${file%.*}.mp4"
+    echo >&2 Skipping...
+    echo >&2
+    continue
+  fi
 
-	# encode
-	HandBrakeCLI -i "${file}" -o "${file%.*}.mp4" --encoder x264 \
-		bframes=2:subme=6:mixed-refs=0:weightb=0:ref=5:8x8dct:me=umh:direct=spatial:trellis=0:b-adapt=2 \
-		-5 --vb "${vkbps}" -2 -T --aencoder faac -B "${akbps}" 2>/dev/null || rm -f -- "${file%.*}.mp4"
-	echo
+  # encode
+  echo -e "${BLD} pass 1 of 2 stats : ${NRM}"
 
-	# restore dts
-	touch -r "$file" "${file%.*}.mp4"
+  if pass1; then
+    echo -e "${BLD} pass 2 of 2 stats : ${NRM}"
+    pass2
+  else
+    echo -e "${BLD}${RED} Pass 1 failed, exiting!${NRM}"
+    exit 1
+  fi
+
+  # restore dts
+  touch -r "$file" "${file%.*}.mp4"
 done
+
+# vim:set ts=2 sw=2 et:
