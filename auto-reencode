@@ -2,7 +2,7 @@
 # Run in the dir containing the target files you wish to convert to x264.
 # There are no arguments.
 # The script will copy both the audio and video bitrates into the new file
-# via metadata from mediainfo and will retain the original DTS for you.
+# via metadata from ffprobe and will retain the original DTS for you.
 
 export BLD="\e[01m" RED="\e[01;31m" BLU="\e[01;34m" NRM="\e[00m"
 
@@ -10,8 +10,8 @@ command -v ffmpeg >/dev/null 2>&1 || {
 echo -e "${BLD}${RED}I require ffmpeg but it's not installed. Aborting.${NRM}" >&2
 exit 1; }
 
-command -v mediainfo >/dev/null 2>&1 || {
-echo "${BLD}${RED}I require mediainfo but it's not installed. Aborting.${NRM}" >&2
+command -v ffprobe >/dev/null 2>&1 || {
+echo "${BLD}${RED}I require ffprobe but it's not installed. Aborting.${NRM}" >&2
 exit 1; }
 
 report() {
@@ -19,7 +19,7 @@ report() {
   echo -e "${BLD} file to encode    :${BLU} ${file%.*}"|sed 's|./||'
   echo -e "${NRM}${BLD} video bitrate     : $vkbps kbps${NRM}"
   echo -e "${BLD} audio bitrate     : $akbps kbps${NRM}"
-  echo -e "${BLD} play time         : $ptime${NRM}"
+  echo -e "${BLD} play time         : $ptime sec${NRM}"
 }
 
 pass1() {
@@ -72,14 +72,14 @@ fi
 [[ -z "$EXT" ]] && EXT="flv"
 
 total=$(find . ! -name . -prune -type f -name "*.$EXT"|wc -l)
-n=0
-for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 
+while IFS= read -r -d '' file
+do
+  (( n++ ))
   # find bitrate for video and audio
-  vkbps=$(( $(mediainfo --inform="Video;%BitRate%" "$file") / 1000))
-  akbps=$(( $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000))
-  ptime=$(mediainfo --inform="General;%Duration/String2%" "$file")
-  n=$(( n + 1 ))
+  vkbps=$(( $(ffprobe -v error -select_streams v:0 -show_entries stream=bit_rate -of default=noprint_wrappers=1:nokey=1 "${file}") / 1000))
+  akbps=$(( $(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of default=noprint_wrappers=1:nokey=1 "${file}") / 1000))
+  ptime=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$file")
 
   report
 
@@ -104,6 +104,6 @@ for file in $(find . ! -name . -prune -type f -name "*.$EXT"); do
 
   # restore dts
   touch -r "$file" "${file%.*}.mp4"
-done
+done <   <(find . ! -name . -prune -type f -name "*.$EXT" -print0)
 
 # vim:set ts=2 sw=2 et:
