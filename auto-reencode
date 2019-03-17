@@ -14,25 +14,18 @@ command -v mediainfo >/dev/null 2>&1 || {
 echo "${BLD}${RED}I require mediainfo but it's not installed. Aborting.${NRM}" >&2
 exit 1; }
 
-report() {
-  echo -e "${BLD}${RED}Task $n of $total${NRM}"
-  echo -e "${BLD} file to encode    :${BLU} ${file%.*}"|sed 's|./||'
-  echo -e "${NRM}${BLD} video bitrate     : $vkbps kbps${NRM}"
-  echo -e "${BLD} audio bitrate     : $akbps kbps${NRM}"
-  echo -e "${BLD} play time         : $ptime${NRM}"
-}
-
 pass1() {
   # For syntax, see: https://trac.ffmpeg.org/wiki/Encode/H.264
-
-  nice -19 ffmpeg -v quiet -stats -y -i "${file}" \
+  nice -19 ffmpeg -nostdin -v fatal -stats -y -i "${file}" \
     -c:v libx264 -preset slow -b:v "$vkbps"k -pass 1 \
     -passlogfile "$logfile" \
     -c:a aac -b:a "$akbps"k -f mp4 /dev/null
 }
 
 pass2() {
-  nice -19 ffmpeg -v quiet -stats -i "${file}" -c:v libx264 \
+  # interactive mode of ffmpeg can fuck up without the -nostdin switch
+  # https://www.igorkromin.net/index.php/2016/12/23/prevent-errors-during-ffmpeg-execution-in-a-loop/
+  nice -19 ffmpeg -nostdin -v fatal -stats -y -i "${file}" -c:v libx264 \
     -preset slow -b:v "$vkbps"k -pass 2 \
     -passlogfile "$logfile" \
     -c:a aac -b:a "$akbps"k "${file%.*}.mp4"
@@ -49,7 +42,6 @@ else
   logfile=auto-reencode_ffmpeg2pass
 fi
 
-IFS=$'\012'
 echo 'Enter target file extension [flv,wmv,asf]:'
 read -r EXT
 
@@ -73,16 +65,34 @@ fi
 
 total=$(find . ! -name . -prune -type f -name "*.$EXT"|wc -l)
 
-while IFS= read -r -d '' file
-do
+while IFS= read -r -d '' file; do
   (( n++ ))
-  echo $file
   # find bitrate for video and audio
-  vkbps=$(( $(mediainfo --inform="Video;%BitRate%" "$file") / 1000))
-  akbps=$(( $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000))
+  _vkbps=$(mediainfo --inform="Video;%BitRate%" "$file")
+  _akbps=$(mediainfo --inform="Audio;%BitRate%" "$file")
   ptime=$(mediainfo --inform="General;%Duration/String2%" "$file")
 
-  report
+  ###  TODO make this shorter code perhaps using an array check function
+
+  echo -e "${BLD}${RED}Task $n of $total${NRM}"
+  echo -e "${BLD} file to encode    :${BLU} $file"
+
+  # audio and video bitrate must be an integer
+  if [[ "$_vkbps" =~ ^-?[0-9]+$ ]]; then
+    vkbps=$((_vkbps / 1000))
+  else
+    flag=1
+  fi
+
+  if [[ "$_akbps" =~ ^-?[0-9]+$ ]]; then
+    akbps=$((_akbps / 1000))
+  else
+    akbps=0
+  fi
+
+  echo -e "${NRM}${BLD} video bitrate     : $vkbps kbps${NRM}"
+  echo -e "${BLD} audio bitrate     : $akbps kbps${NRM}"
+  echo -e "${BLD} play time         : $ptime${NRM}"
 
   # do not overwrite existing files
   if [[ -e "${file%.*}.mp4" ]]; then
@@ -92,19 +102,26 @@ do
     continue
   fi
 
-  # encode
-  echo -e "${BLD} pass 1 of 2 stats : ${NRM}"
-
-  if pass1; then
-    echo -e "${BLD} pass 2 of 2 stats : ${NRM}"
-    pass2
+  if [[ $flag -eq 1 ]]; then
+    echo -e "${BLD} ==> Skipping $file due to bad audio or video bitrate${NRM}."
   else
-    echo -e "${BLD}${RED} Pass 1 failed, exiting!${NRM}"
-    exit 1
-  fi
+    # encode
+    echo -e "${BLD} pass 1 of 2 stats : ${NRM}"
 
-  # restore dts
-  touch -r "$file" "${file%.*}.mp4"
+    if pass1; then
+      echo -e "${BLD} pass 2 of 2 stats : ${NRM}"
+      pass2
+    else
+      echo -e "${BLD}${RED} Pass 1 failed, exiting!${NRM}"
+      exit 1
+    fi
+
+    # restore dts
+    touch -r "$file" "${file%.*}.mp4"
+    fi
+  # reset badflag to null
+  unset flag
+  echo
 done <   <(find . ! -name . -prune -type f -name "*.$EXT" -print0)
 
 # vim:set ts=2 sw=2 et:
