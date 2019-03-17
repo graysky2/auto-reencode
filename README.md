@@ -12,4 +12,7 @@ Call the script in the directory containing the target files to convert.
 AUR Package: https://aur.archlinux.org/packages/auto-reencode
 
 ### Dependencies
+* bash
+* coreutils
 * ffmpeg
+* findutils

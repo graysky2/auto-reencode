@@ -2,7 +2,7 @@
 # Run in the dir containing the target files you wish to convert to x264.
 # There are no arguments.
 # The script will copy both the audio and video bitrates into the new file
-# via metadata from ffprobe and will retain the original DTS for you.
+# via metadata from mediainfo and will retain the original DTS for you.
 
 export BLD="\e[01m" RED="\e[01;31m" BLU="\e[01;34m" NRM="\e[00m"
 
@@ -10,8 +10,8 @@ command -v ffmpeg >/dev/null 2>&1 || {
 echo -e "${BLD}${RED}I require ffmpeg but it's not installed. Aborting.${NRM}" >&2
 exit 1; }
 
-command -v ffprobe >/dev/null 2>&1 || {
-echo "${BLD}${RED}I require ffprobe but it's not installed. Aborting.${NRM}" >&2
+command -v mediainfo >/dev/null 2>&1 || {
+echo "${BLD}${RED}I require mediainfo but it's not installed. Aborting.${NRM}" >&2
 exit 1; }
 
 report() {
@@ -76,12 +76,11 @@ total=$(find . ! -name . -prune -type f -name "*.$EXT"|wc -l)
 while IFS= read -r -d '' file
 do
   (( n++ ))
+  echo $file
   # find bitrate for video and audio
-  vkbps=$(( $(ffprobe -v error -select_streams v:0 -show_entries stream=bit_rate -of default=noprint_wrappers=1:nokey=1 "${file}") / 1000))
-  akbps=$(( $(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of default=noprint_wrappers=1:nokey=1 "${file}") / 1000))
-  # ffprobe reports time in sec with a fuckton of decimals, piping through awk rounds to a int
-  secs=$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$file"|uniq|awk '{print int($1+0.5)}')
-  ptime=$(printf '%02dh:%02dm:%02ds\n' $(($secs/3600)) $(($secs%3600/60)) $(($secs%60)))
+  vkbps=$(( $(mediainfo --inform="Video;%BitRate%" "$file") / 1000))
+  akbps=$(( $(mediainfo --inform="Audio;%BitRate%" "$file") / 1000))
+  ptime=$(mediainfo --inform="General;%Duration/String2%" "$file")
 
   report
 
